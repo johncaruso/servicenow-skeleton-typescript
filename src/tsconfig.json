@@ -4,7 +4,11 @@
 		"target": "es5",
 		"noLib": false,
         "outDir": "dist/",
-        "strict": true
+        "strict": true,
+        "sourceRoot": "src/",
+        "typeRoots": [
+            "types"
+        ]
     },
     "exclude": [
         "node_modules"

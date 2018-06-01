@@ -27,7 +27,6 @@
     "package.json",
     "package-lock.json",
     "servicenowconfig.js",
-    "typings.json",
     "tslint.json"
   ],
   "dependencies": {
@@ -52,7 +51,6 @@
     "@types/mocha": "^5.2.0",
     "@types/node": "^9.6.2",
     "@types/request": "^2.47.0",
-    "mocha": "^5.1.1",
-    "typings": "^2.1.1"
+    "mocha": "^5.1.1"
   }
 }

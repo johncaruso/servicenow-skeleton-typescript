@@ -1,7 +1,0 @@
-{
-    "dependencies": {},
-    "globalDependencies": {
-      "servicenowserver": "github:bryceg/servicenow-dts/server/scoped-jakarta/index.d.ts#v2.4"
-    }
-  }
-  

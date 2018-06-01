@@ -45,8 +45,7 @@ export class Gulpfile {
                 console.info(chalk.yellow("Requesting type info from SN for: ") + types);
                 this.invokeServiceNow(`${this.config.uri}/api/avana/dev_integration/schema`, "POST", { tables: types })
                     .then(result => {
-                        this.writeDTS(this.config.dts.sndts, this.config.dts.refs, this.config.dts.ignoreFields, result);
-                        this.addReferenceToIndex(this.config.dts.sndts);
+                        this.writeDTS(path.join(this.config.src, this.config.dts.sndts), this.config.dts.ignoreFields, result);
                         resolve();
                     })
                     .catch(reject);
@@ -58,7 +57,7 @@ export class Gulpfile {
     public format(){
         const prettier = require("gulp-prettier");
         return gulp
-                .src(this.config.src + "**/*.ts")
+                .src([`${this.config.src}**/*.ts`, `!${this.config.src}types/**`])
                 .pipe(prettier({
                     parser: "typescript",
                     printWidth: 200,
@@ -85,7 +84,7 @@ export class Gulpfile {
         };
 
         return gulp
-                .src(this.config.src + "**/*.ts")
+                .src([`${this.config.src}**/*.ts`, `!${this.config.src}types/**`])
                 .pipe(gulpTsLint(tslintOptions))
                 .pipe(gulpTsLint.report({
                     allowWarnings: true
@@ -110,7 +109,7 @@ export class Gulpfile {
         };
 
         return gulp
-                .src(this.config.src + "**/*.ts")
+                .src([`${this.config.src}**/*.ts`, `!${this.config.src}types/**`])
                 .pipe(gulpTsLint(tslintOptions))
                 .pipe(gulpTsLint.report({
                     allowWarnings: true
@@ -122,7 +121,10 @@ export class Gulpfile {
         const tsProject = gulpts.createProject(this.config.tsconfig, {
             typescript: require("typescript")
         });
-        console.log("Building with TypeScript compiler version " + tsProject.typescript.version);
+
+        if (tsProject.typescript){
+            console.log("Building with TypeScript compiler version " + tsProject.typescript.version);
+        }
         
         return gulp
                 .src(this.config.src + "**/*.ts")
@@ -255,17 +257,14 @@ export class Gulpfile {
             mappings[this.config.application] = {
                 etag: result.sys_app.etag,
                 fields: {
-                    u_dts: this.config.dts.appdts,
+                    u_dts: this.config.src + this.config.dts.appdts,
                     u_typings: "typings.json"
                 },
                 type: "sys_app"
             };
 
             fs.writeFileSync("typings.json", result.sys_app.fields.u_typings);
-            fs.writeFileSync(this.config.dts.appdts, result.sys_app.fields.u_dts);
-
-            this.addReferenceToIndex(this.config.dts.appdts);
-            this.addReferenceToIndex(this.config.dts.sndts);
+            fs.writeFileSync( this.config.src + this.config.dts.appdts, result.sys_app.fields.u_dts);
         }
 
         Object.keys(result.files)
@@ -298,14 +297,13 @@ export class Gulpfile {
             .then(result => {
                 Object.keys(result).forEach(key => {
                     const appref = result[key];
-                    const dtsPath = "typings/appdependencies/" + appref.name + "/index.d.ts";
+                    const dtsPath = `${this.config.src}types/appdependencies/${appref.name}/index.d.ts`;
 
                     if (!fs.existsSync(dtsPath)) {
                         this.mkdirpSync(path.dirname(dtsPath));
                     }
 
                     fs.writeFileSync(dtsPath, appref.dts);
-                    this.addReferenceToIndex(dtsPath);
                 });
             });
     }
@@ -415,25 +413,18 @@ export class Gulpfile {
     return types;
   }
 
-    private writeDTS(target: string, references: Array<string>, ignoreFields: Array<string>, definitions: any) {
-        let dts = references
-                    .map(ref => `///<reference path="${ref}" />`)
-                    .join("\r\n");
-
-        dts += "\r\n\r\ndeclare module sn {\r\n" +
-            "\texport module Server {\r\n" +
-            "\t\texport interface IGlideServerRecord {\r\n";
+    private writeDTS(target: string, ignoreFields: Array<string>, definitions: any) {
+        let dts = "declare namespace servicenow {\r\n\tinterface GlideRecord {\r\n";
 
         const types = Object.keys(definitions).sort();
-        types.forEach(type => dts += `\t\t\tnew (type: "${type}"): Types.I${type};\r\n`);
+        types.forEach(type => dts += `\t\tnew (type: "${type}"): ${type};\r\n`);
 
-        dts += "\t\t}\r\n"
-            + "\t}\r\n"
-            + "\texport module Types {\r\n";
+        dts += "\t}\r\n";
+        
         types.forEach(type => {
             const def = definitions[type];
-            const superclass = def.superclass ? "I" + def.superclass : "Server.IGlideServerRecord";
-            dts += `\t\texport interface I${type} extends ${superclass} {\r\n`;
+            const superclass = def.superclass ? def.superclass : "GlideRecord";
+            dts += `\tinterface ${type} extends ${superclass} {\r\n`;
             const fields = Object.keys(def.fields).sort();
             fields.forEach(fieldname => {
                 const fielddef = def.fields[fieldname];
@@ -448,18 +439,18 @@ export class Gulpfile {
                             type = `string`;
                     }
 
-                    dts += `\t\t\t${fieldname}: sn.Server.IGlideElement & ${type}`;
+                    dts += `\t\t${fieldname}: GlideElement & ${type}`;
 
                     if (fielddef.reference && definitions.hasOwnProperty(fielddef.reference)) {
-                        dts += " & I" + fielddef.reference;
+                        dts += " & " + fielddef.reference;
                     }
 
                     dts += ";\r\n";
                 }
             });
-            dts += "\t\t}\r\n";
+            dts += "\t}\r\n";
         });
-        dts += "\t}\r\n}";
+        dts += "}\r\n";
 
         const targetdir = path.dirname(target);
         if (!fs.existsSync(targetdir)) {
@@ -505,29 +496,6 @@ export class Gulpfile {
                     }
                 });
         });
-    }
-
-    private addReferenceToIndex(referencePath: string) {
-        const pathToIndex = "typings/index.d.ts";
-        let write = false;
-
-        // Get the path relative to the index file
-        const relativePath = path.relative(path.dirname(pathToIndex), path.dirname(referencePath));
-
-        // Check if the path already exists
-        const regexPath = "path=['\"]" + path.join(relativePath, path.basename(referencePath)).replace(/\\/g, "/") + "['\"]";
-        const appdtsRegex = new RegExp(regexPath, "g");
-
-        let content = fs.readFileSync(pathToIndex, "utf8");
-
-        if (!appdtsRegex.test(content)) {
-            content += "\r\n/// <reference path=\"" + path.join(relativePath, path.basename(referencePath)).replace(/\\/g, "/") + "\" />";
-            write = true;
-        }
-
-        if (write) {
-            fs.writeFileSync(pathToIndex, content);
-        }
     }
 }
 

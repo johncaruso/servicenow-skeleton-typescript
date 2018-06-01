@@ -14,7 +14,7 @@ if(process.argv[process.argv.length-1] == 'init'){
 
     var appRoot = process.cwd();
 
-    var copyFiles = ['servicenowconfig.js', 'src/tsconfig.json', 'typings.json', 'tslint.json'];
+    var copyFiles = ['servicenowconfig.js', 'src/tsconfig.json', 'tslint.json'];
     var sourceRoot = path.relative(appRoot, path.dirname(path.dirname(process.argv[1])));
 
     copyFiles.forEach(file => {
@@ -32,7 +32,13 @@ if(process.argv[process.argv.length-1] == 'init'){
     
     fs.writeFileSync(gulpFileDest, content);
 
-    console.info("Init complete.  You may also need to run 'typings install' to finish setting up the skeleton");
+    if(!fs.existsSync('src/'))
+        fs.mkdirSync('src/');
+
+    if(!fs.existsSync('src/tyeps'))
+        fs.mkdirSync('src/types');
+
+    console.info("Init complete.  You will need to run 'npm i @types/servicenow --save' to finish setting up the skeleton");
 }
 else{
     console.info('Valid Commands:');

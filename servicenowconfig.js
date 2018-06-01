@@ -37,11 +37,8 @@ module.exports = {
         }
     },
     dts: {
-        appdts: 'typings\\application.d.ts',
-        sndts: 'typings\\servicenow.d.ts',
-        refs: [
-            'index.d.ts'
-        ],
+        appdts: 'types\\application.d.ts',
+        sndts: 'types\\servicenow.d.ts',
         ignoreFields: [
             'sys_id',
             'sys_created_on',
